@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diet Plans · GYMOS</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tables.css">
+<link rel="stylesheet" href="css/forms.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body data-page="diets">
+  <script>
+document.write(`
+  <style>
+    #customLoader {
+      position: fixed;
+      inset: 0;
+      z-index: 999999999;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .loaderSpinner {
+      width: 70px;
+      height: 70px;
+      border: 6px solid #eef2f5;
+      border-top: 6px solid #2563eb;
+      border-right: 6px solid #2563eb;
+      border-radius: 50%;
+      animation: rotateSpinner 1s linear infinite;
+      margin-bottom: 25px;
+    }
+
+    @keyframes rotateSpinner {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .loaderBrand {
+      font-size: 26px;
+      font-weight: 700;
+      color: #000;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .loaderLoading {
+      font-size: 16px;
+      font-weight: 400;
+      color: #666;
+    }
+
+    #customLoader.loaderDone {
+      opacity: 0;
+      transition: opacity .35s ease;
+    }
+  </style>
+
+  <div id="customLoader">
+    <div class="loaderSpinner"></div>
+    <div class="loaderBrand">GYMOS</div>
+    <div class="loaderLoading" id="loaderLoadingText">Loading...</div>
+  </div>
+`);
+
+(function () {
+  const loader = document.getElementById("customLoader");
+  const shownAt = Date.now();
+  const MIN_VISIBLE_MS = 500;   // avoids an ugly flash on fast loads
+  const MAX_WAIT_MS = 20000;    // safety net if app:ready never fires
+  let hidden = false;
+
+  function hideLoader() {
+    if (hidden || !loader) return;
+    hidden = true;
+    const elapsed = Date.now() - shownAt;
+    const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+    setTimeout(function () {
+      loader.classList.add("loaderDone");
+      setTimeout(function () { loader.remove(); }, 400);
+    }, wait);
+  }
+
+  document.addEventListener("app:ready", hideLoader);
+  setTimeout(hideLoader, MAX_WAIT_MS);
+})();
+</script>
+<div id="app-shell"></div>
+<script src="js/api.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/core.js"></script>
+
+<script src="js/modules.js"></script>
+<script src="js/engine.js"></script>
+<script>App.boot('diets', () => Engine.mount('diets'));</script>
+</body>
+</html>

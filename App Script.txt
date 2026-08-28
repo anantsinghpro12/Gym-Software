@@ -1,0 +1,2457 @@
+/* ============================================================
+   GYMOS – Google Apps Script Backend (Full Multi-tenant)
+   Auto-creates sheets + headers for every module
+   ============================================================ */
+
+const CONFIG = {
+  JWT_SECRET: "GYMOS_SECRET_CHANGE_THIS_TO_LONG_RANDOM_STRING_2026",
+  TOKEN_HOURS: 12
+};
+
+
+/* ============================================================
+   TYPE → SHEET
+   ============================================================ */
+
+const TYPE_TO_SHEET = {
+  M: "members",
+  P: "plans",
+  PAY: "payments",
+  INV: "invoices",
+  AT: "attendance",
+  T: "trainers",
+  CL: "classes",
+  WK: "workouts",
+  D: "diets",
+  EXP: "expenses",
+  PR: "products",
+  ST: "staff",
+  B: "branches",
+  ACT: "activity"
+};
+
+
+/* ============================================================
+   SHEET HEADERS
+   ============================================================ */
+
+const SHEET_HEADERS = {
+
+  members: [
+    "id",
+    "gym_id",
+    "name",
+    "phone",
+    "email",
+    "gender",
+    "planId",
+    "start",
+    "end",
+    "status",
+    "branchId",
+    "trainerId",
+    "emergency",
+    "goal",
+    "joined",
+    "bloodPressure",
+    "heartRate",
+    "bloodSugar",
+    "bodyTemp",
+    "bloodType",
+    "height",
+    "weight",
+    "created_at",
+    "updated_at"
+  ],
+
+  plans: [
+    "id",
+    "gym_id",
+    "name",
+    "category",
+    "price",
+    "duration",
+    "durUnit",
+    "joiningFee",
+    "tax",
+    "discount",
+    "freezeDays",
+    "guestPasses",
+    "dailyLimit",
+    "classAccess",
+    "trainerAccess",
+    "workoutAccess",
+    "dietAccess",
+    "lockerAccess",
+    "branchId",
+    "desc",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  payments: [
+    "id",
+    "gym_id",
+    "memberId",
+    "planId",
+    "amount",
+    "date",
+    "method",
+    "status",
+    "note",
+    "created_at",
+    "updated_at"
+  ],
+
+  invoices: [
+    "id",
+    "gym_id",
+    "payId",
+    "memberId",
+    "subtotal",
+    "discount",
+    "tax",
+    "total",
+    "status",
+    "date",
+    "created_at",
+    "updated_at"
+  ],
+
+  attendance: [
+    "id",
+    "gym_id",
+    "memberId",
+    "date",
+    "time",
+    "type",
+    "created_at",
+    "updated_at"
+  ],
+
+  trainers: [
+    "id",
+    "gym_id",
+    "name",
+    "phone",
+    "email",
+    "specialization",
+    "salary",
+    "commission",
+    "joined",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  classes: [
+    "id",
+    "gym_id",
+    "name",
+    "trainerId",
+    "capacity",
+    "time",
+    "days",
+    "duration",
+    "location",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  workouts: [
+    "id",
+    "gym_id",
+    "name",
+    "muscle",
+    "equipment",
+    "difficulty",
+    "instructions",
+    "video",
+    "created_at",
+    "updated_at"
+  ],
+
+  diets: [
+    "id",
+    "gym_id",
+    "memberId",
+    "goal",
+    "calories",
+    "protein",
+    "carbs",
+    "fats",
+    "meals",
+    "notes",
+    "created_at",
+    "updated_at"
+  ],
+
+  expenses: [
+    "id",
+    "gym_id",
+    "category",
+    "amount",
+    "date",
+    "method",
+    "note",
+    "created_at",
+    "updated_at"
+  ],
+
+  products: [
+    "id",
+    "gym_id",
+    "name",
+    "sku",
+    "category",
+    "purchasePrice",
+    "sellPrice",
+    "stock",
+    "minStock",
+    "supplierId",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  staff: [
+    "id",
+    "gym_id",
+    "name",
+    "phone",
+    "email",
+    "role",
+    "branchId",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  branches: [
+    "id",
+    "gym_id",
+    "name",
+    "city",
+    "state",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  activity: [
+    "id",
+    "gym_id",
+    "ts",
+    "action",
+    "entity",
+    "entityId",
+    "user",
+    "created_at",
+    "updated_at"
+  ],
+
+  Gyms: [
+    "gym_id",
+    "gym_code",
+    "gym_name",
+    "owner_user_id",
+    "email",
+    "phone",
+    "address",
+    "city",
+    "state",
+    "country",
+    "plan",
+    "currency",
+    "date_format",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+
+  Users: [
+    "user_id",
+    "gym_id",
+    "role",
+    "name",
+    "email",
+    "password_hash",
+    "phone",
+    "status",
+    "created_at",
+    "updated_at",
+    "last_login"
+  ],
+
+  Settings: [
+    "setting_key",
+    "gym_id",
+    "value",
+    "updated_at"
+  ]
+};
+
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+
+function generateId(prefix) {
+
+  const d = new Date();
+
+  const ts = Utilities.formatDate(
+    d,
+    "UTC",
+    "yyyyMMddHHmmss"
+  );
+
+  const r = Math.floor(Math.random() * 900) + 100;
+
+  return prefix + ts + r;
+}
+
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+
+/* ============================================================
+   GET SHEET
+   ============================================================ */
+
+function getSheet(name) {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  let sheet = ss.getSheetByName(name);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+  }
+
+  const headers = SHEET_HEADERS[name];
+
+  if (headers && headers.length) {
+
+    const lastCol = sheet.getLastColumn();
+
+    const firstRow = lastCol > 0
+      ? sheet
+          .getRange(1, 1, 1, lastCol)
+          .getValues()[0]
+      : [];
+
+    const hasHeaders = firstRow.some(function(cell) {
+
+      return String(cell).trim() !== "";
+
+    });
+
+    if (!hasHeaders) {
+
+      sheet
+        .getRange(1, 1, 1, headers.length)
+        .setValues([headers]);
+
+      sheet
+        .getRange(1, 1, 1, headers.length)
+        .setFontWeight("bold");
+
+      sheet.setFrozenRows(1);
+    }
+  }
+
+  return sheet;
+}
+
+
+/* ============================================================
+   NORMALIZE SHEETS VALUE
+   ============================================================ */
+
+function normalizeCellValue(value) {
+
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value)
+  ) {
+
+    return Utilities.formatDate(
+      value,
+      Session.getScriptTimeZone(),
+      "yyyy-MM-dd"
+    );
+  }
+
+  return value;
+}
+
+
+/* ============================================================
+   SHEET → OBJECTS
+   ============================================================ */
+
+function sheetToObjects(sheetName) {
+
+  const sheet = getSheet(sheetName);
+
+  if (!sheet) {
+    return [];
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  if (!data || data.length < 2) {
+    return [];
+  }
+
+  const headers = data[0].map(function(h) {
+
+    return String(h).trim();
+
+  });
+
+  return data
+    .slice(1)
+
+    .filter(function(row) {
+
+      return row.some(function(v) {
+
+        return String(v).trim() !== "";
+
+      });
+
+    })
+
+    .map(function(row) {
+
+      const obj = {};
+
+      headers.forEach(function(header, i) {
+
+        obj[header] =
+          normalizeCellValue(row[i]);
+
+      });
+
+      return obj;
+
+    });
+}
+
+
+/* ============================================================
+   APPEND OBJECT
+   ============================================================ */
+
+function appendObject(sheetName, obj) {
+
+  const sheet = getSheet(sheetName);
+
+  const lastColumn =
+    Math.max(sheet.getLastColumn(), 1);
+
+  let headers =
+    sheet
+      .getRange(1, 1, 1, lastColumn)
+      .getValues()[0]
+
+      .map(function(h) {
+
+        return String(h).trim();
+
+      })
+
+      .filter(Boolean);
+
+
+  if (
+    headers.length === 0 &&
+    SHEET_HEADERS[sheetName]
+  ) {
+
+    headers =
+      SHEET_HEADERS[sheetName];
+
+    sheet
+      .getRange(1, 1, 1, headers.length)
+      .setValues([headers]);
+
+    sheet
+      .getRange(1, 1, 1, headers.length)
+      .setFontWeight("bold");
+
+    sheet.setFrozenRows(1);
+  }
+
+
+  if (headers.length === 0) {
+
+    throw new Error(
+      "Sheet has no header row: " +
+      sheetName
+    );
+
+  }
+
+
+  const row = headers.map(function(header) {
+
+    const value = obj[header];
+
+    return (
+      value !== undefined &&
+      value !== null
+    )
+      ? value
+      : "";
+
+  });
+
+
+  sheet.appendRow(row);
+}
+
+
+/* ============================================================
+   UPDATE OBJECT
+   ============================================================ */
+
+function updateObject(
+  sheetName,
+  idField,
+  idValue,
+  updates
+) {
+
+  const sheet =
+    getSheet(sheetName);
+
+  const data =
+    sheet.getDataRange().getValues();
+
+  if (!data || data.length < 2) {
+    return false;
+  }
+
+  const headers =
+    data[0].map(function(h) {
+
+      return String(h).trim();
+
+    });
+
+
+  const idCol =
+    headers.indexOf(idField);
+
+  if (idCol === -1) {
+    return false;
+  }
+
+
+  for (
+    var i = 1;
+    i < data.length;
+    i++
+  ) {
+
+    if (
+      String(data[i][idCol]) ===
+      String(idValue)
+    ) {
+
+      headers.forEach(function(
+        header,
+        col
+      ) {
+
+        if (
+          Object.prototype.hasOwnProperty.call(
+            updates,
+            header
+          )
+        ) {
+
+          sheet
+            .getRange(
+              i + 1,
+              col + 1
+            )
+            .setValue(
+              updates[header]
+            );
+        }
+
+      });
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+/* ============================================================
+   DELETE OBJECT
+   ============================================================ */
+
+function deleteObject(
+  sheetName,
+  idField,
+  idValue
+) {
+
+  const sheet =
+    getSheet(sheetName);
+
+  const data =
+    sheet.getDataRange().getValues();
+
+  if (!data || data.length < 2) {
+    return false;
+  }
+
+  const headers =
+    data[0].map(function(h) {
+
+      return String(h).trim();
+
+    });
+
+
+  const idCol =
+    headers.indexOf(idField);
+
+  if (idCol === -1) {
+    return false;
+  }
+
+
+  for (
+    var i = 1;
+    i < data.length;
+    i++
+  ) {
+
+    if (
+      String(data[i][idCol]) ===
+      String(idValue)
+    ) {
+
+      sheet.deleteRow(i + 1);
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+/* ============================================================
+   FIND ONE
+   ============================================================ */
+
+function findOne(
+  sheetName,
+  field,
+  value
+) {
+
+  return sheetToObjects(sheetName)
+    .find(function(row) {
+
+      return String(
+        row[field] || ""
+      )
+        .trim()
+        .toLowerCase() ===
+        String(value || "")
+          .trim()
+          .toLowerCase();
+
+    }) || null;
+}
+
+
+/* ============================================================
+   JSON
+   ============================================================ */
+
+function jsonOut(obj) {
+
+  return ContentService
+
+    .createTextOutput(
+      JSON.stringify(obj)
+    )
+
+    .setMimeType(
+      ContentService.MimeType.JSON
+    );
+}
+
+
+/* ============================================================
+   TOKEN
+   ============================================================ */
+
+function createToken(payload) {
+
+  const data =
+    Object.assign(
+      {},
+      payload,
+      {
+        exp:
+          Date.now() +
+          CONFIG.TOKEN_HOURS *
+          60 *
+          60 *
+          1000
+      }
+    );
+
+
+  return Utilities
+    .base64EncodeWebSafe(
+      JSON.stringify(data)
+    );
+}
+
+
+function verifyToken(token) {
+
+  try {
+
+    if (!token) {
+      return null;
+    }
+
+    const json =
+      Utilities
+        .newBlob(
+          Utilities.base64DecodeWebSafe(token)
+        )
+        .getDataAsString();
+
+    const data =
+      JSON.parse(json);
+
+    if (
+      !data.exp ||
+      Number(data.exp) < Date.now()
+    ) {
+
+      return null;
+    }
+
+    return data;
+
+  } catch (e) {
+
+    return null;
+
+  }
+}
+
+
+function getUserFromToken(token) {
+
+  if (!token) {
+    return null;
+  }
+
+  const payload =
+    verifyToken(token);
+
+  if (!payload) {
+    return null;
+  }
+
+  return findOne(
+    "Users",
+    "user_id",
+    payload.user_id
+  );
+}
+
+
+/* ============================================================
+   MAIN ROUTER
+   ============================================================ */
+
+function doGet(e) {
+  return handle(e);
+}
+
+
+function doPost(e) {
+  return handle(e);
+}
+
+
+function handle(e) {
+
+  try {
+
+    var body = {};
+
+
+    if (
+      e &&
+      e.postData &&
+      e.postData.contents
+    ) {
+
+      try {
+
+        body =
+          JSON.parse(
+            e.postData.contents
+          );
+
+      } catch (err) {
+
+        body = {};
+
+      }
+    }
+
+
+    var action =
+      body.action ||
+      (
+        e &&
+        e.parameter &&
+        e.parameter.action
+      ) ||
+      "";
+
+
+    var token =
+      body.token ||
+      (
+        e &&
+        e.parameter &&
+        e.parameter.token
+      ) ||
+      null;
+
+
+    if (!action) {
+
+      return jsonOut({
+        success: false,
+        error: "Missing action"
+      });
+
+    }
+
+
+    /* ========================================================
+       PUBLIC
+       ======================================================== */
+
+    if (action === "login") {
+
+      return jsonOut(
+        doLogin(body)
+      );
+
+    }
+
+
+    /* ========================================================
+       AUTHENTICATED
+       ======================================================== */
+
+    var user =
+      getUserFromToken(token);
+
+
+    if (!user) {
+
+      return jsonOut({
+        success: false,
+        error: "Unauthorized"
+      });
+
+    }
+
+
+    switch (action) {
+
+
+      /* ======================================================
+         SUPER ADMIN — GET GYMS
+         ====================================================== */
+
+      case "getGyms":
+
+        if (
+          String(user.role)
+            .toUpperCase() !==
+          "SUPER_ADMIN"
+        ) {
+
+          return jsonOut({
+            success: false,
+            error: "Forbidden"
+          });
+
+        }
+
+        return jsonOut(
+          doGetGymsWithPasswords()
+        );
+
+
+      /* ======================================================
+         CREATE GYM
+         ====================================================== */
+
+      case "createGym":
+
+        if (
+          String(user.role)
+            .toUpperCase() !==
+          "SUPER_ADMIN"
+        ) {
+
+          return jsonOut({
+            success: false,
+            error: "Forbidden"
+          });
+
+        }
+
+        return jsonOut(
+          doCreateGym(
+            body.data || body
+          )
+        );
+
+
+      /* ======================================================
+         UPDATE GYM
+         ====================================================== */
+
+      case "updateGym":
+
+        if (
+          String(user.role)
+            .toUpperCase() !==
+          "SUPER_ADMIN"
+        ) {
+
+          return jsonOut({
+            success: false,
+            error: "Forbidden"
+          });
+
+        }
+
+        return jsonOut(
+          doUpdateGym(
+            body.data || body
+          )
+        );
+
+
+      /* ======================================================
+         DELETE GYM
+         ====================================================== */
+
+      case "deleteGym":
+
+        if (
+          String(user.role)
+            .toUpperCase() !==
+          "SUPER_ADMIN"
+        ) {
+
+          return jsonOut({
+            success: false,
+            error: "Forbidden"
+          });
+
+        }
+
+        return jsonOut(
+          doDeleteGym(
+            body.data || body
+          )
+        );
+
+
+      /* ======================================================
+         SESSION
+         ====================================================== */
+
+      case "getSession":
+
+        return jsonOut({
+
+          success: true,
+
+          data: {
+
+            user_id:
+              user.user_id,
+
+            gym_id:
+              user.gym_id || "",
+
+            role:
+              user.role,
+
+            name:
+              user.name,
+
+            email:
+              user.email
+
+          }
+
+        });
+
+
+      /* ======================================================
+         PROFILE
+         ====================================================== */
+
+      case "getProfile":
+
+        return jsonOut(
+          doGetProfile(user)
+        );
+
+
+      /* ======================================================
+         CHANGE PASSWORD
+         ====================================================== */
+
+      case "changePassword":
+
+        return jsonOut(
+          doChangePassword(
+            user,
+            body.data || body
+          )
+        );
+
+
+      /* ======================================================
+         GENERIC DATA
+         ====================================================== */
+
+      case "getData":
+
+        return jsonOut(
+          getDataByType(
+            user.gym_id,
+            body.type ||
+            (
+              body.data &&
+              body.data.type
+            )
+          )
+        );
+
+
+      case "putData":
+
+        return jsonOut(
+          putDataByType(
+            user.gym_id,
+
+            body.type ||
+            (
+              body.data &&
+              body.data.type
+            ),
+
+            body.records ||
+            (
+              body.data &&
+              body.data.records
+            ) ||
+            []
+          )
+        );
+
+
+      /* ======================================================
+         DASHBOARD
+         ====================================================== */
+
+      case "getDashboard":
+
+        return jsonOut(
+          getDashboardData(
+            user.gym_id
+          )
+        );
+
+
+      default:
+
+        return jsonOut({
+          success: false,
+          error:
+            "Unknown action: " +
+            action
+        });
+
+    }
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    return jsonOut({
+
+      success: false,
+
+      error:
+        error.message ||
+        "Server error"
+
+    });
+
+  }
+
+}
+
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+
+function doLogin(body) {
+
+  var email =
+    String(
+      body.email || ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  var password =
+    String(
+      body.password || ""
+    )
+      .trim();
+
+
+  if (!email) {
+
+    return {
+      success: false,
+      error: "Email is required"
+    };
+
+  }
+
+
+  if (!password) {
+
+    return {
+      success: false,
+      error: "Password is required"
+    };
+
+  }
+
+
+  var users =
+    sheetToObjects("Users");
+
+
+  var user =
+    users.find(function(u) {
+
+      return String(
+        u.email || ""
+      )
+        .toLowerCase()
+        .trim() === email;
+
+    });
+
+
+  if (!user) {
+
+    return {
+      success: false,
+      error: "Email not found"
+    };
+
+  }
+
+
+  if (
+    String(
+      user.status || ""
+    )
+      .toUpperCase() !==
+    "ACTIVE"
+  ) {
+
+    return {
+      success: false,
+      error:
+        "Account is not ACTIVE"
+    };
+
+  }
+
+
+  if (
+    String(
+      user.password_hash || ""
+    ).trim() !==
+    password
+  ) {
+
+    return {
+      success: false,
+      error: "Invalid password"
+    };
+
+  }
+
+
+  updateObject(
+    "Users",
+    "user_id",
+    user.user_id,
+    {
+      last_login:
+        nowISO()
+    }
+  );
+
+
+  var token =
+    createToken({
+
+      user_id:
+        user.user_id,
+
+      gym_id:
+        user.gym_id || "",
+
+      role:
+        user.role
+
+    });
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      token: token,
+
+      user: {
+
+        user_id:
+          user.user_id,
+
+        gym_id:
+          user.gym_id || "",
+
+        role:
+          user.role,
+
+        name:
+          user.name,
+
+        email:
+          user.email
+
+      }
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   SETTINGS PROFILE
+   ============================================================ */
+
+function doGetProfile(user) {
+
+  var profile = {
+
+    email:
+      user.email,
+
+    password:
+      user.password_hash || "",
+
+    status:
+      user.status
+
+  };
+
+
+  if (user.gym_id) {
+
+    var gym =
+      findOne(
+        "Gyms",
+        "gym_id",
+        user.gym_id
+      );
+
+
+    if (gym) {
+
+      profile.gym_name =
+        gym.gym_name;
+
+      profile.phone =
+        gym.phone;
+
+      profile.currency =
+        gym.currency;
+
+      profile.date_format =
+        gym.date_format;
+
+      profile.status =
+        gym.status ||
+        user.status;
+
+    }
+
+  }
+
+
+  return {
+
+    success: true,
+
+    data: profile
+
+  };
+
+}
+
+
+/* ============================================================
+   CHANGE PASSWORD
+   ============================================================ */
+
+function doChangePassword(
+  user,
+  data
+) {
+
+  var newPassword =
+    String(
+      (data && data.password) ||
+      ""
+    ).trim();
+
+
+  if (!newPassword) {
+
+    return {
+      success: false,
+      error:
+        "New password is required"
+    };
+
+  }
+
+
+  if (newPassword.length < 6) {
+
+    return {
+      success: false,
+      error:
+        "New password must be at least 6 characters"
+    };
+
+  }
+
+
+  var updated =
+    updateObject(
+
+      "Users",
+
+      "user_id",
+
+      user.user_id,
+
+      {
+
+        password_hash:
+          newPassword,
+
+        updated_at:
+          nowISO()
+
+      }
+
+    );
+
+
+  if (!updated) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Could not find your account to update"
+
+    };
+
+  }
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      user_id:
+        user.user_id
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   SUPER ADMIN — GET GYMS + OWNER PASSWORD
+   ============================================================ */
+
+/*
+   IMPORTANT:
+
+   Gyms sheet:
+      owner_user_id
+
+   Users sheet:
+      user_id
+      password_hash
+
+   We match:
+
+      Gyms.owner_user_id
+             ↓
+      Users.user_id
+             ↓
+      Users.password_hash
+
+   Then return the password as:
+
+      password
+
+   This allows the Super Admin frontend to show the
+   actual password instead of "Set".
+*/
+
+function doGetGymsWithPasswords() {
+
+  var gyms =
+    sheetToObjects("Gyms");
+
+
+  var users =
+    sheetToObjects("Users");
+
+
+  var result =
+    gyms.map(function(gym) {
+
+      var ownerUser =
+        users.find(function(user) {
+
+          return String(
+            user.user_id || ""
+          ).trim() ===
+          String(
+            gym.owner_user_id || ""
+          ).trim();
+
+        });
+
+
+      return {
+
+        id:
+          gym.gym_id || "",
+
+        gym_id:
+          gym.gym_id || "",
+
+        gym_code:
+          gym.gym_code || "",
+
+        name:
+          gym.gym_name || "",
+
+        ownerEmail:
+          gym.email ||
+          (
+            ownerUser &&
+            ownerUser.email
+          ) ||
+          "",
+
+        password:
+          ownerUser
+            ? String(
+                ownerUser.password_hash || ""
+              )
+            : "",
+
+        phone:
+          gym.phone || "",
+
+        address:
+          gym.address || "",
+
+        city:
+          gym.city || "",
+
+        state:
+          gym.state || "",
+
+        country:
+          gym.country || "",
+
+        plan:
+          gym.plan || "",
+
+        currency:
+          gym.currency || "INR",
+
+        dateFormat:
+          gym.date_format ||
+          "DD MMM YYYY",
+
+        status:
+          gym.status || "ACTIVE",
+
+        owner_user_id:
+          gym.owner_user_id || "",
+
+        created:
+          gym.created_at || "",
+
+        created_at:
+          gym.created_at || "",
+
+        updated_at:
+          gym.updated_at || ""
+
+      };
+
+    });
+
+
+  return {
+
+    success: true,
+
+    data: result
+
+  };
+
+}
+
+
+/* ============================================================
+   CREATE GYM
+   ============================================================ */
+
+function doCreateGym(data) {
+
+  var gymId =
+    generateId("GYM");
+
+  var userId =
+    generateId("USR");
+
+  var now =
+    nowISO();
+
+
+  var gymName =
+    String(
+      data.name ||
+      data.gym_name ||
+      ""
+    ).trim();
+
+
+  var ownerEmail =
+    String(
+      data.ownerEmail ||
+      data.email ||
+      ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  var password =
+    String(
+      data.password || ""
+    );
+
+
+  if (!gymName) {
+
+    return {
+      success: false,
+      error:
+        "Gym name is required"
+    };
+
+  }
+
+
+  if (!ownerEmail) {
+
+    return {
+      success: false,
+      error:
+        "Owner email is required"
+    };
+
+  }
+
+
+  if (!password) {
+
+    return {
+      success: false,
+      error:
+        "Password is required"
+    };
+
+  }
+
+
+  if (
+    findOne(
+      "Users",
+      "email",
+      ownerEmail
+    )
+  ) {
+
+    return {
+
+      success: false,
+
+      error:
+        "An account with this email already exists"
+
+    };
+
+  }
+
+
+  appendObject(
+    "Gyms",
+    {
+
+      gym_id:
+        gymId,
+
+      gym_code:
+        data.gym_code ||
+        gymId,
+
+      gym_name:
+        gymName,
+
+      owner_user_id:
+        userId,
+
+      email:
+        ownerEmail,
+
+      phone:
+        data.phone || "",
+
+      address:
+        data.address || "",
+
+      city:
+        data.city || "",
+
+      state:
+        data.state || "",
+
+      country:
+        data.country ||
+        "India",
+
+      plan:
+        data.plan ||
+        "BASIC",
+
+      currency:
+        data.currency ||
+        "INR",
+
+      date_format:
+        data.dateFormat ||
+        "DD MMM YYYY",
+
+      status:
+        data.status ||
+        "ACTIVE",
+
+      created_at:
+        now,
+
+      updated_at:
+        now
+
+    }
+  );
+
+
+  appendObject(
+    "Users",
+    {
+
+      user_id:
+        userId,
+
+      gym_id:
+        gymId,
+
+      role:
+        "GYM_OWNER",
+
+      name:
+        data.owner_name ||
+        (
+          gymName +
+          " Owner"
+        ),
+
+      email:
+        ownerEmail,
+
+      password_hash:
+        password,
+
+      phone:
+        data.phone || "",
+
+      status:
+        "ACTIVE",
+
+      created_at:
+        now,
+
+      updated_at:
+        now,
+
+      last_login:
+        ""
+
+    }
+  );
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      gym_id:
+        gymId,
+
+      user_id:
+        userId
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   UPDATE GYM
+   ============================================================ */
+
+function doUpdateGym(data) {
+
+  var gymId =
+    data.id ||
+    data.gym_id;
+
+
+  if (!gymId) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Gym ID is required"
+
+    };
+
+  }
+
+
+  var existing =
+    findOne(
+      "Gyms",
+      "gym_id",
+      gymId
+    );
+
+
+  if (!existing) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Gym not found"
+
+    };
+
+  }
+
+
+  var updates = {
+
+    updated_at:
+      nowISO()
+
+  };
+
+
+  if (
+    data.name !== undefined ||
+    data.gym_name !== undefined
+  ) {
+
+    updates.gym_name =
+      data.name !== undefined
+        ? data.name
+        : data.gym_name;
+
+  }
+
+
+  if (
+    data.ownerEmail !== undefined ||
+    data.email !== undefined
+  ) {
+
+    updates.email =
+      String(
+        data.ownerEmail !== undefined
+          ? data.ownerEmail
+          : data.email
+      )
+        .toLowerCase()
+        .trim();
+
+  }
+
+
+  if (
+    data.phone !== undefined
+  ) {
+
+    updates.phone =
+      data.phone;
+
+  }
+
+
+  if (
+    data.currency !== undefined
+  ) {
+
+    updates.currency =
+      data.currency;
+
+  }
+
+
+  if (
+    data.dateFormat !== undefined
+  ) {
+
+    updates.date_format =
+      data.dateFormat;
+
+  }
+
+
+  if (
+    data.status !== undefined
+  ) {
+
+    updates.status =
+      data.status;
+
+  }
+
+
+  updateObject(
+    "Gyms",
+    "gym_id",
+    gymId,
+    updates
+  );
+
+
+  /* ==========================================================
+     UPDATE OWNER USER
+     ========================================================== */
+
+  if (
+    existing.owner_user_id
+  ) {
+
+    var userUpdates = {
+
+      updated_at:
+        nowISO()
+
+    };
+
+
+    if (
+      data.ownerEmail !== undefined ||
+      data.email !== undefined
+    ) {
+
+      userUpdates.email =
+        String(
+          data.ownerEmail !== undefined
+            ? data.ownerEmail
+            : data.email
+        )
+          .toLowerCase()
+          .trim();
+
+    }
+
+
+    if (
+      data.phone !== undefined
+    ) {
+
+      userUpdates.phone =
+        data.phone;
+
+    }
+
+
+    /*
+       IMPORTANT:
+
+       If password is sent,
+       overwrite the exact password_hash
+       for this gym owner.
+    */
+
+    if (
+      data.password !== undefined &&
+      String(data.password) !== ""
+    ) {
+
+      userUpdates.password_hash =
+        String(data.password);
+
+    }
+
+
+    if (
+      data.name
+    ) {
+
+      userUpdates.name =
+        data.owner_name ||
+        (
+          data.name +
+          " Owner"
+        );
+
+    }
+
+
+    updateObject(
+      "Users",
+      "user_id",
+      existing.owner_user_id,
+      userUpdates
+    );
+
+  }
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      gym_id:
+        gymId
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   DELETE GYM
+   ============================================================ */
+
+function doDeleteGym(data) {
+
+  var gymId =
+    data.id ||
+    data.gym_id;
+
+
+  if (!gymId) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Gym ID is required"
+
+    };
+
+  }
+
+
+  var gym =
+    findOne(
+      "Gyms",
+      "gym_id",
+      gymId
+    );
+
+
+  if (!gym) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Gym not found"
+
+    };
+
+  }
+
+
+  if (
+    gym.owner_user_id
+  ) {
+
+    deleteObject(
+      "Users",
+      "user_id",
+      gym.owner_user_id
+    );
+
+  }
+
+
+  var deleted =
+    deleteObject(
+      "Gyms",
+      "gym_id",
+      gymId
+    );
+
+
+  return {
+
+    success:
+      deleted,
+
+    data: {
+
+      gym_id:
+        gymId
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   GENERIC DATA
+   ============================================================ */
+
+function getDataByType(
+  gymId,
+  type
+) {
+
+  if (!type) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Missing type"
+
+    };
+
+  }
+
+
+  var sheetName =
+    TYPE_TO_SHEET[type];
+
+
+  if (!sheetName) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Unknown type: " +
+        type
+
+    };
+
+  }
+
+
+  var rows =
+    sheetToObjects(sheetName)
+
+      .filter(function(r) {
+
+        return String(
+          r.gym_id || ""
+        ) ===
+        String(gymId);
+
+      });
+
+
+  return {
+
+    success: true,
+
+    data:
+      rows
+
+  };
+
+}
+
+
+/* ============================================================
+   PUT DATA
+   ============================================================ */
+
+function putDataByType(
+  gymId,
+  type,
+  records
+) {
+
+  if (!type) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Missing type"
+
+    };
+
+  }
+
+
+  if (!Array.isArray(records)) {
+
+    return {
+
+      success: false,
+
+      error:
+        "records must be an array"
+
+    };
+
+  }
+
+
+  var sheetName =
+    TYPE_TO_SHEET[type];
+
+
+  if (!sheetName) {
+
+    return {
+
+      success: false,
+
+      error:
+        "Unknown type: " +
+        type
+
+    };
+
+  }
+
+
+  var sheet =
+    getSheet(sheetName);
+
+
+  var data =
+    sheet
+      .getDataRange()
+      .getValues();
+
+
+  if (data.length > 1) {
+
+    var headers =
+      data[0].map(function(h) {
+
+        return String(h).trim();
+
+      });
+
+
+    var gymCol =
+      headers.indexOf("gym_id");
+
+
+    for (
+      var i =
+        data.length - 1;
+      i >= 1;
+      i--
+    ) {
+
+      if (
+        gymCol === -1 ||
+        String(
+          data[i][gymCol]
+        ) ===
+        String(gymId)
+      ) {
+
+        sheet.deleteRow(
+          i + 1
+        );
+
+      }
+
+    }
+
+  }
+
+
+  records.forEach(
+    function(rec) {
+
+      var clean =
+        Object.assign(
+          {},
+          rec,
+          {
+
+            gym_id:
+              gymId,
+
+            updated_at:
+              nowISO()
+
+          }
+        );
+
+
+      if (!clean.created_at) {
+
+        clean.created_at =
+          nowISO();
+
+      }
+
+
+      appendObject(
+        sheetName,
+        clean
+      );
+
+    }
+  );
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      count:
+        records.length
+
+    }
+
+  };
+
+}
+
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+
+function getDashboardData(
+  gymId
+) {
+
+  var members =
+    sheetToObjects("members")
+
+      .filter(function(m) {
+
+        return String(
+          m.gym_id
+        ) ===
+        String(gymId);
+
+      });
+
+
+  var payments =
+    sheetToObjects("payments")
+
+      .filter(function(p) {
+
+        return String(
+          p.gym_id
+        ) ===
+        String(gymId);
+
+      });
+
+
+  var today =
+    Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone(),
+      "yyyy-MM-dd"
+    );
+
+
+  var todayRevenue =
+    payments
+
+      .filter(function(p) {
+
+        return (
+          String(
+            p.date || ""
+          ).indexOf(today) === 0
+        ) &&
+        String(
+          p.status || ""
+        ).toUpperCase() ===
+        "PD";
+
+      })
+
+      .reduce(function(
+        sum,
+        p
+      ) {
+
+        return (
+          sum +
+          Number(
+            p.amount || 0
+          )
+        );
+
+      }, 0);
+
+
+  return {
+
+    success: true,
+
+    data: {
+
+      totalMembers:
+        members.length,
+
+      activeMembers:
+        members.filter(
+          function(m) {
+
+            return String(
+              m.status || ""
+            ).toUpperCase() ===
+            "A";
+
+          }
+        ).length,
+
+      todayRevenue:
+        todayRevenue
+
+    }
+
+  };
+
+}

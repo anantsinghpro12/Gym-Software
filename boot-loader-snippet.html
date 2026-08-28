@@ -1,0 +1,96 @@
+<script>
+document.write(`
+  <style>
+    #customLoader {
+      position: fixed;
+      inset: 0;
+      z-index: 999999999;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .loaderSpinner {
+      width: 70px;
+      height: 70px;
+      border: 6px solid #eef2f5;
+      border-top: 6px solid #2563eb;
+      border-right: 6px solid #2563eb;
+      border-radius: 50%;
+      animation: rotateSpinner 1s linear infinite;
+      margin-bottom: 25px;
+    }
+
+    @keyframes rotateSpinner {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .loaderBrand {
+      font-size: 26px;
+      font-weight: 700;
+      color: #000;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .loaderLoading {
+      font-size: 16px;
+      font-weight: 400;
+      color: #666;
+    }
+
+    #customLoader.loaderDone {
+      opacity: 0;
+      transition: opacity .35s ease;
+    }
+  </style>
+
+  <div id="customLoader">
+    <div class="loaderSpinner"></div>
+    <div class="loaderBrand">GYMOS</div>
+    <div class="loaderLoading" id="loaderLoadingText">Loading dashboard...</div>
+  </div>
+`);
+
+(function () {
+  const loader = document.getElementById("customLoader");
+  const shownAt = Date.now();
+
+  // Never make the user wait less than this (avoids an ugly flash
+  // on fast connections) — but otherwise the loader stays up for
+  // exactly as long as real loading takes, no more, no less.
+  const MIN_VISIBLE_MS = 500;
+
+  // Safety net only: if something goes wrong and app:ready never
+  // fires (e.g. a script error), don't trap the user behind the
+  // spinner forever.
+  const MAX_WAIT_MS = 20000;
+
+  let hidden = false;
+
+  function hideLoader() {
+    if (hidden || !loader) return;
+    hidden = true;
+
+    const elapsed = Date.now() - shownAt;
+    const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+
+    setTimeout(function () {
+      loader.classList.add("loaderDone");
+      setTimeout(function () { loader.remove(); }, 400);
+    }, wait);
+  }
+
+  // Real readiness signal — dispatched by core.js at the end of
+  // App.boot() (dashboard/members/settings/... pages) and by
+  // login.js once the login form is mounted.
+  document.addEventListener("app:ready", hideLoader);
+
+  // Fallback so a broken page doesn't hide the spinner forever.
+  setTimeout(hideLoader, MAX_WAIT_MS);
+})();
+</script>

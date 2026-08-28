@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Super Admin · GYMOS</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/forms.css">
+<style>
+  #captcha {
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+    border: 1.5px solid #d1d5db;
+    display: block;
+  }
+  .captcha-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .captcha-refresh {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1.5px solid #d1d5db;
+    background: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .captcha-refresh:hover { background: #f3f4f6; }
+</style>
+</head>
+<body>
+<div class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">🛡️ GYMOS Super Admin</div>
+    <h1 class="auth-title">Super Admin Login</h1>
+    <p class="auth-sub">Tenant &amp; gym management console</p>
+    <div class="auth-error" id="err"></div>
+    <form id="sa-form">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="email" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="password" required autocomplete="current-password">
+          <button type="button" class="pw-toggle" id="pw-toggle">👁</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Security Check</label>
+        <div class="captcha-row">
+          <canvas id="captcha" width="180" height="52" aria-label="CAPTCHA image"></canvas>
+          <button type="button" class="captcha-refresh" id="captcha-refresh" title="Refresh code">↻</button>
+        </div>
+        <input type="text" id="captcha-input" placeholder="Enter the code above (case sensitive)" required autocomplete="off" maxlength="6" spellcheck="false">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Verify &amp; Continue →</button>
+    </form>
+  </div>
+</div>
+
+<!-- CORRECT ORDER — only these three -->
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/sapower.js"></script>
+</body>
+</html>
